@@ -14,11 +14,10 @@
 int job_index = 0;
 int NUMBER_OF_JOBS = 6;
 int * jobArray = NULL;
-pthread_mutex_t * mutex = NULL;
-pthread_cond_t check_rest = PTHREAD_COND_INITIALIZER;
 int JOB_REQUEST = 123;
 int NO_JOBS = -1;
-int DONE = -2;
+pthread_mutex_t * mutex = NULL;
+pthread_cond_t check_rest = PTHREAD_COND_INITIALIZER;
 
 void * doJob(void * param) {
     int current_job = 0;
@@ -35,7 +34,7 @@ void * doJob(void * param) {
 	            pthread_mutex_unlock(mutex);
 	            break;
 	        }
-			if(REST_OF_JOBS ==(NUMBER_OF_JOBS - (job_index + 1))) {
+			if(REST_OF_JOBS == (NUMBER_OF_JOBS - (job_index + 1))) {
 			    	pthread_cond_signal(&check_rest);	
 			    }
 	    pthread_mutex_unlock(mutex);
@@ -43,9 +42,9 @@ void * doJob(void * param) {
         printf("[%d]: the {%d} is current job now. job_index == %d\n", rank, current_job, job_index);
         sleep(current_job);
     }
- printf("%d has done %d jobs\n", rank, done_jobs);
-//param = (void *) done_jobs; 
- //param = &done_jobs; 
+	pthread_mutex_lock(mutex);
+		jobArray[0] = done_jobs;
+	pthread_mutex_unlock(mutex);
 return param;
 }
 
@@ -68,23 +67,19 @@ void * seacrchJob(void * param) {
 
     while(no_jobs_counter < (jobArray[1] - 1)) {	//size - 1;
 		pthread_mutex_lock(mutex);
-			while(job_index < NUMBER_OF_JOBS - 1 - REST_OF_JOBS) {
-			//while(REST_OF_JOBS != (NUMBER_OF_JOBS - (job_index + 1))) {
+			//while(job_index < NUMBER_OF_JOBS - 1 - REST_OF_JOBS) {
+			while(REST_OF_JOBS < (NUMBER_OF_JOBS - (job_index + 1))) {
 				pthread_cond_wait(&check_rest, mutex);
 			}
 		pthread_mutex_unlock(mutex);	    		
 
 		while(!gotJob && ((size - 1) != no_jobs_counter)) {
-    		//if(3 == rank) printf("[%d] before request extra job[%d]\n", rank, rank_for_request);
         	MPI_Send(&JOB_REQUEST, 1, MPI_INT, rank_for_request, 169, COMMW);
 	    	MPI_Recv(&response, 1, MPI_INT, MPI_ANY_SOURCE, 170, COMMW, &status);
-	    	//if(3 == rank) printf("[%d] after request extra job[%d]\n", rank, rank_for_request);
 	    	
 	    	if(NO_JOBS == response) {
 	    		no_jobs_counter++;
 	    		not_to_ask[rank_for_request] = 1;
-	    		//if(3 == rank) printf("[%d] no_jobs_counter - %d (from %d)\n", rank, no_jobs_counter, rank_for_request);
-	    		//other threads have no jobs -> current thread is done.
 	    	}
 
 	    	//get next rank for job request
@@ -97,22 +92,19 @@ void * seacrchJob(void * param) {
 
 	    	if(NO_JOBS != response) {
 	    		gotJob = 1;
-	    		//if(3 == rank) 
-	    			printf("[%d] has got extra job {%d}\n", rank, response);
+	    		//printf("[%d] has got extra job {%d}\n", rank, response);
 	    		//add job to jobArray, perhaps expand it (and change NUMBER_OF_JOBS)
 	    		pthread_mutex_lock(mutex);
 	    			NUMBER_OF_JOBS++;
 	    			jobArray[NUMBER_OF_JOBS + SHIFT_IN_ARRAY - 1] = response;
-	    			//better use realloc
 	    		pthread_mutex_unlock(mutex);	    
 	    		break;		
 	    	} 
 		}
 		gotJob = 0;
 	}
-	printf("[%d] out of searching cycle\n", rank);
+	//printf("[%d] out of searching cycle\n", rank);
 	free(not_to_ask);
-	printf("[%d] ok\n", rank);
 }
 
 void * responseForRequests(void * param) {
@@ -124,9 +116,7 @@ void * responseForRequests(void * param) {
 	int size = jobArray[1];
 	MPI_Status status;
    while(1) {
-   		//printf("in responseThread [%d]\n", rank);
     	MPI_Recv(&requset, 1, MPI_INT, MPI_ANY_SOURCE, 169, COMMW, &status);
-    	//printf("got requset: %d [%d]\n", requset, rank);
     	if(JOB_REQUEST == requset) {
 	        pthread_mutex_lock(mutex);
 	        	if(NUMBER_OF_JOBS == job_index) {
@@ -149,20 +139,17 @@ void * responseForRequests(void * param) {
 	        pthread_mutex_unlock(mutex);
 		}
 	}
-	//printf("out of BIGResponse [%d]\n", rank);
 	//for ervery process except self and one from main cycle
 	for(int i = 2; i < size; i++) {	
 		MPI_Recv(&requset, 1, MPI_INT, MPI_ANY_SOURCE, 169, COMMW, &status);
 		MPI_Send(&NO_JOBS, 1, MPI_INT, status.MPI_SOURCE, 170, COMMW);
 	}
-	//printf("out of Response [%d]\n", rank);
+	//printf("[%d] out of Response\n", rank);
 }
 
 int main(int argc, char* argv[]){
 	int rank = 0;
 	int size = 0;
-	//int done_jobs = 0;
-	void * done_jobs = 0;
 	pthread_t jobThread;
 	pthread_t responseThread;
 	pthread_t searchThread;
@@ -202,11 +189,9 @@ int main(int argc, char* argv[]){
 	    }
 
 	    pthread_join (searchThread, NULL);
-	    //pthread_join (jobThread, (void *)&done_jobs);
 	    pthread_join (jobThread, NULL);
-	    //printf("[%d]waiting responseThread end\n", rank);
 	    pthread_join (responseThread, NULL);
-	    //printf("%d has done %d jobs\n", rank, *(int *)done_jobs);
+	    printf("%d has done %d jobs\n", rank, jobArray[0]);
 	    MPI_Barrier(COMMW);
 	    int ret_value = pthread_mutex_destroy(mutex);
 	    if(ret_value) {

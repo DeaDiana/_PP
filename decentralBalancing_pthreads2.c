@@ -175,6 +175,7 @@ int main(int argc, char* argv[]){
     MPI_Comm_rank(COMMW, &rank);
 
 	    mutex = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
+	    code = pthread_mutex_init(mutex, NULL);
 		jobArray = (int *) malloc(sizeof(int) * BUFF_SIZE);
 		memset(jobArray, 0, sizeof(int) * BUFF_SIZE);
 	    job_index = 0;
@@ -186,17 +187,17 @@ int main(int argc, char* argv[]){
 
 	    code = pthread_create(&jobThread, NULL, doJob, NULL);        
 	    if (code != 0) {
-	        printf("[%d] error occurs on creating {jobThread}\n", rank);
+	        printf("[%d] error occurs on creating {jobThread} ERROR: %d\n", rank, code);
 	        exit(1);
 	    }
 	    code = pthread_create(&responseThread, NULL, responseForRequests, NULL);        
 	    if (code != 0) {
-	        printf("[%d] error occurs on creating {responseThread}\n", rank);
+	        printf("[%d] error occurs on creating {responseThread} ERROR: %d\n", rank, code);
 	        exit(1);
 	    }
 	    code = pthread_create(&searchThread, NULL, seacrchJob, NULL);
 	    if (code!=0) {
-	        printf("[%d] error occurs on creating {searchThread}\n", rank);
+	        printf("[%d] error occurs on creating {searchThread} ERROR: %d\n", rank, code);
 	        exit(1);
 	    }
 
@@ -209,12 +210,12 @@ int main(int argc, char* argv[]){
 	    MPI_Barrier(COMMW);
 	    int ret_value = pthread_mutex_destroy(mutex);
 	    if(ret_value) {
-	        printf("[%d] error occurs on destroying {mutex}\n", rank);
+	        printf("[%d] error occurs on destroying {mutex} ERROR: %d\n", rank, ret_value);
 	        exit(EXIT_FAILURE);
 	    }     
 	    ret_value = pthread_cond_destroy(&check_rest);
 	    if(ret_value) {
-	        printf("[%d] error occurs on destroying {condition variable}\n", rank);
+	        printf("[%d] error occurs on destroying {condition variable} ERROR: %d\n", rank,  ret_value);
 	        exit(EXIT_FAILURE);
 	    }
 	    free(jobArray);

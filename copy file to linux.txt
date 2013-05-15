@@ -1,0 +1,5 @@
+ctrl a
+ctrl c
+cat > test.cpp
+right click
+g++ -fopenmp test.cpp

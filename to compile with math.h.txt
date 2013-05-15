@@ -1,0 +1,1 @@
+mpicc -fopenmp -std=c99 qwe.c -o qw -lm

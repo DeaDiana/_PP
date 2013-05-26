@@ -1,0 +1,1 @@
+scp hpcuser06@10.4.60.10:~/anisutina/qw.clog2 tpr

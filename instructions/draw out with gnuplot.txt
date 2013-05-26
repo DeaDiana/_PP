@@ -1,0 +1,4 @@
+gnuplot
+set terminal png
+set output "result.png"
+plot "plate" binary array=30x30 format="%lf" with image
